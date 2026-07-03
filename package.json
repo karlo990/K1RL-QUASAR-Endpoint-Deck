@@ -1,0 +1,10 @@
+{
+  "name": "k1rl-quasar-endpoint-glass",
+  "version": "1.0.0",
+  "private": true,
+  "description": "K1RL QUASAR endpoint watch/debug console - static single-page dashboard",
+  "scripts": {
+    "build": "echo 'static site, no build step'",
+    "dev": "npx serve ."
+  }
+}

@@ -1,0 +1,896 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QUASAR // Endpoint Deck</title>
+<style>
+  :root{
+    --bg:#0a0e1a;
+    --bg2:#0d1224;
+    --panel: rgba(22,28,48,0.55);
+    --panel-raised: rgba(30,37,64,0.65);
+    --panel-solid:#141a30;
+    --line: rgba(140,160,255,0.14);
+    --line-bright: rgba(140,160,255,0.32);
+    --blue:#3ec9ff;
+    --blue-dim:#1f6f96;
+    --deepblue:#3d6bff;
+    --purple:#8b7cff;
+    --purple-dim:#4d3fa3;
+    --green:#3ee68a;
+    --green-dim:#1f7d52;
+    --amber:#ffb84d;
+    --red:#ff5e7e;
+    --text:#dbe2f5;
+    --text-dim:#7b86ad;
+    --mono: 'IBM Plex Mono','SF Mono',Consolas,monospace;
+    --blur: 18px;
+  }
+  *{box-sizing:border-box;}
+  html,body{
+    margin:0;padding:0;background:var(--bg);color:var(--text);
+    font-family:var(--mono);height:100%;
+  }
+  body{
+    background:
+      radial-gradient(ellipse 900px 500px at 12% -8%, rgba(139,124,255,0.20), transparent 55%),
+      radial-gradient(ellipse 700px 500px at 88% 8%, rgba(62,201,255,0.14), transparent 55%),
+      radial-gradient(ellipse 900px 700px at 50% 110%, rgba(62,201,255,0.08), transparent 60%),
+      linear-gradient(180deg, var(--bg) 0%, var(--bg2) 100%);
+    background-attachment:fixed;
+  }
+  .wrap{max-width:1440px;margin:0 auto;padding:22px 22px 60px;}
+
+  /* ---- Header / connection strip ---- */
+  header{
+    display:flex;justify-content:space-between;align-items:flex-end;
+    border-bottom:1px solid var(--line);padding-bottom:16px;margin-bottom:18px;
+    flex-wrap:wrap;gap:12px;
+  }
+  .brand{display:flex;align-items:baseline;gap:10px;position:relative;}
+  .brand .mark{
+    font-size:23px;font-weight:800;letter-spacing:4px;
+    background:linear-gradient(90deg, var(--purple) 0%, var(--purple) 22%, var(--blue) 65%, var(--blue) 100%);
+    -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:var(--blue);
+    text-shadow:none;
+    filter:drop-shadow(0 0 14px rgba(62,201,255,0.35)) drop-shadow(0 0 10px rgba(139,124,255,0.25));
+  }
+  .brand .mark .mark-k1rl{
+    background:none;-webkit-text-fill-color:#fff;color:#fff;
+    filter:drop-shadow(0 0 8px rgba(255,255,255,0.35));
+  }
+  .brand::after{
+    content:'';position:absolute;left:1px;bottom:-17px;width:64px;height:2px;
+    background:linear-gradient(90deg, var(--purple), var(--blue));
+    box-shadow:0 0 8px rgba(62,201,255,0.6);border-radius:2px;
+  }
+  .brand .sub{font-size:11px;color:var(--text-dim);letter-spacing:1.5px;text-transform:uppercase;}
+  .conn-controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+  .conn-controls input[type=text]{
+    background:var(--panel-raised);border:1px solid var(--line);color:var(--text);
+    font-family:var(--mono);font-size:12px;padding:8px 11px;border-radius:8px;width:280px;
+    backdrop-filter:blur(var(--blur));
+  }
+  .conn-controls input[type=text]:focus{outline:none;border-color:var(--blue-dim);box-shadow:0 0 0 3px rgba(62,201,255,0.12);}
+  button{
+    font-family:var(--mono);font-size:11px;letter-spacing:0.5px;text-transform:uppercase;
+    background:var(--panel-raised);border:1px solid var(--line);color:var(--text);
+    padding:8px 14px;border-radius:8px;cursor:pointer;transition:all .15s;
+    backdrop-filter:blur(var(--blur));
+  }
+  button:hover{border-color:var(--line-bright);color:var(--blue);box-shadow:0 0 14px rgba(62,201,255,0.12);}
+  button.primary{border-color:var(--blue-dim);color:var(--blue);}
+  button.active{background:linear-gradient(135deg,rgba(62,201,255,0.16),rgba(139,124,255,0.16));border-color:var(--blue);color:var(--blue);box-shadow:0 0 16px rgba(62,201,255,0.18);}
+  button.danger:hover{border-color:var(--red);color:var(--red);box-shadow:0 0 14px rgba(255,94,126,0.15);}
+  select{
+    font-family:var(--mono);font-size:11px;background:var(--panel-raised);
+    border:1px solid var(--line);color:var(--text);padding:8px 10px;border-radius:8px;
+    backdrop-filter:blur(var(--blur));
+  }
+
+  /* ---- Status LEDs ---- */
+  .led{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:6px;flex:none;}
+  .led.ok{background:var(--green);box-shadow:0 0 8px var(--green);}
+  .led.warn{background:var(--amber);box-shadow:0 0 8px var(--amber);}
+  .led.bad{background:var(--red);box-shadow:0 0 8px var(--red);}
+  .led.off{background:#3a4468;}
+  .watchall-label.dump-ready{cursor:pointer;}
+  .watchall-label.dump-ready:hover{filter:brightness(1.25);}
+  .watchall-label.dump-ready #watchAllCount{color:var(--green) !important;text-decoration:underline;text-underline-offset:3px;}
+
+  /* ---- Service config strip (per-Space base URL + key) ---- */
+  .svc-strip{
+    display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px;
+    margin-bottom:16px;
+  }
+  .svc-box{
+    background:var(--panel);border:1px solid var(--line);border-radius:12px;
+    padding:10px 12px;display:flex;flex-direction:column;gap:7px;
+    backdrop-filter:blur(var(--blur));
+    box-shadow:0 4px 24px rgba(0,0,0,0.25);
+  }
+  .svc-box .svc-name{
+    font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--text-dim);
+    display:flex;align-items:center;justify-content:space-between;
+  }
+  .svc-box input[type=text]{
+    background:rgba(10,14,26,0.55);border:1px solid var(--line);color:var(--text);
+    font-family:var(--mono);font-size:11px;padding:7px 9px;border-radius:7px;width:100%;
+  }
+  .svc-box input[type=text]:focus{outline:none;border-color:var(--blue-dim);}
+  .svc-box .svc-key{opacity:0.85;}
+
+  /* ---- Watch-all bar ---- */
+  .watchall-bar{
+    display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+    background:var(--panel);border:1px solid var(--line);border-radius:12px;
+    padding:10px 14px;margin-bottom:16px;font-size:11px;
+    backdrop-filter:blur(var(--blur));
+    box-shadow:0 4px 24px rgba(0,0,0,0.25);
+  }
+  .watchall-label{display:flex;align-items:center;color:var(--text-dim);}
+
+  /* ---- Endpoint tab rail ---- */
+  .tab .tled{width:6px;height:6px;border-radius:50%;flex:none;background:#3a4468;}
+  .tab .tled.ok{background:var(--green);box-shadow:0 0 6px var(--green);}
+  .tab .tled.warn{background:var(--amber);box-shadow:0 0 6px var(--amber);}
+  .tab .tled.bad{background:var(--red);box-shadow:0 0 6px var(--red);}
+  .tab .svc-chip{
+    font-size:8.5px;color:var(--text-dim);border:1px solid var(--line);border-radius:4px;
+    padding:1px 5px;text-transform:uppercase;letter-spacing:0.5px;background:rgba(255,255,255,0.03);
+  }
+  .rail{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:16px;}
+  .tab{
+    display:flex;align-items:center;gap:7px;
+    padding:9px 13px;border:1px solid var(--line);border-radius:9px;
+    background:var(--panel);cursor:pointer;font-size:11.5px;color:var(--text-dim);
+    transition:all .15s;backdrop-filter:blur(var(--blur));
+  }
+  .tab:hover{color:var(--text);border-color:var(--line-bright);}
+  .tab.selected{
+    color:var(--blue);border-color:var(--blue-dim);
+    background:linear-gradient(135deg,rgba(62,201,255,0.10),rgba(139,124,255,0.10));
+    box-shadow:0 0 18px rgba(62,201,255,0.10);
+  }
+  .tab .path{color:inherit;}
+  .tab .freq{font-size:9px;color:var(--text-dim);border:1px solid var(--line);border-radius:4px;padding:1px 4px;}
+
+  /* ---- Main grid ---- */
+  .grid{display:grid;grid-template-columns:1fr;gap:18px;}
+  .panel{
+    background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden;
+    backdrop-filter:blur(var(--blur));
+    box-shadow:0 8px 32px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.03);
+  }
+  .panel-head{
+    display:flex;justify-content:space-between;align-items:center;
+    padding:12px 16px;border-bottom:1px solid var(--line);background:rgba(255,255,255,0.02);
+  }
+  .panel-head .title{font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-dim);display:flex;align-items:center;}
+  .panel-head .meta{font-size:11px;color:var(--text-dim);display:flex;gap:14px;}
+  .panel-body{padding:16px;}
+
+  /* ---- Symbol cards (parsed view) ---- */
+  .symgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px;}
+  .symcard{
+    background:var(--panel-raised);border:1px solid var(--line);border-radius:11px;padding:11px 13px;
+    position:relative;transition:border-color .15s;
+  }
+  .symcard:hover{border-color:var(--line-bright);}
+  .symcard .row1{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;}
+  .symcard .sym{font-size:13px;font-weight:700;color:var(--text);letter-spacing:0.5px;}
+  .symcard .regime{font-size:9px;padding:2px 7px;border-radius:20px;text-transform:uppercase;letter-spacing:0.5px;}
+  .regime.normal{background:rgba(62,230,138,0.14);color:var(--green);}
+  .regime.low,.regime.very_low{background:rgba(255,184,77,0.14);color:var(--amber);}
+  .regime.high,.regime.extreme{background:rgba(255,94,126,0.14);color:var(--red);}
+  .symcard .stat{display:flex;justify-content:space-between;font-size:11px;color:var(--text-dim);margin-top:3px;}
+  .symcard .stat b{color:var(--text);font-weight:500;}
+  .symcard .stale-bar{height:3px;background:rgba(255,255,255,0.06);border-radius:2px;margin-top:8px;overflow:hidden;}
+  .symcard .stale-fill{height:100%;background:linear-gradient(90deg,var(--blue),var(--purple));transition:width .4s;}
+  .symcard.stale .stale-fill{background:var(--red);}
+  .spark{margin-top:8px;height:26px;width:100%;display:block;}
+
+  /* ---- Raw JSON viewer ---- */
+  pre.json{
+    margin:0;font-size:12px;line-height:1.6;white-space:pre-wrap;word-break:break-word;
+    max-height:480px;overflow:auto;color:var(--text);
+  }
+  pre.json .k{color:var(--blue);}
+  pre.json .s{color:var(--green);}
+  pre.json .n{color:var(--amber);}
+  pre.json .b{color:var(--purple);}
+  pre.json .flash{animation:flashline 1s ease-out;}
+  @keyframes flashline{0%{background:rgba(62,201,255,0.14);}100%{background:transparent;}}
+
+  /* ---- History log ---- */
+  .history{max-height:220px;overflow-y:auto;font-size:11px;}
+  .hist-row{
+    display:grid;grid-template-columns:70px 1fr auto;gap:10px;
+    padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.04);color:var(--text-dim);
+  }
+  .hist-row .t{color:var(--text-dim);}
+  .hist-row .diff-add{color:var(--green);}
+  .hist-row .diff-rem{color:var(--red);}
+  .hist-row .diff-chg{color:var(--amber);}
+  .hist-row:hover{background:rgba(255,255,255,0.03);}
+
+  .footer-note{font-size:10px;color:var(--text-dim);text-align:center;margin-top:26px;letter-spacing:0.5px;}
+  .badge-live{
+    display:inline-flex;align-items:center;gap:5px;font-size:10px;color:var(--green);
+    border:1px solid var(--green-dim);border-radius:20px;padding:4px 10px;
+    background:rgba(62,230,138,0.06);
+  }
+  .badge-live .dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 1.4s infinite;}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.3;}}
+
+  .empty{color:var(--text-dim);font-size:12px;padding:30px;text-align:center;}
+  .errbox{
+    background:rgba(255,94,126,0.08);border:1px solid rgba(255,94,126,0.3);color:var(--red);
+    padding:11px 13px;border-radius:9px;font-size:12px;margin-bottom:10px;
+  }
+  ::-webkit-scrollbar{width:8px;height:8px;}
+  ::-webkit-scrollbar-track{background:transparent;}
+  ::-webkit-scrollbar-thumb{background:var(--line-bright);border-radius:4px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="brand">
+      <span class="mark"><span class="mark-k1rl">K1RL</span> QUASAR</span>
+      <span class="sub">Endpoint Deck</span>
+    </div>
+    <div class="conn-controls">
+      <select id="pollRate">
+        <option value="0">Manual</option>
+        <option value="2000">2s</option>
+        <option value="5000" selected>5s</option>
+        <option value="10000">10s</option>
+        <option value="30000">30s</option>
+      </select>
+      <button id="btnStart" class="primary">▶ Start</button>
+      <button id="btnStop">■ Stop</button>
+      <button id="btnClearHist" class="danger">Clear log</button>
+    </div>
+  </header>
+
+  <div class="svc-strip" id="svcControls"></div>
+
+  <div class="watchall-bar">
+    <span class="watchall-label" id="watchAllLabel" style="cursor:default;" title="Full dump not ready yet"><span class="led off" id="watchAllLed"></span>Monitor All <span id="watchAllCount" style="color:var(--text-dim);"></span></span>
+    <select id="watchAllRate">
+      <option value="0">Off</option>
+      <option value="10000">10s</option>
+      <option value="20000" selected>20s</option>
+      <option value="60000">60s</option>
+    </select>
+    <button id="btnWatchAll" class="primary">▶ Watch all endpoints</button>
+    <button id="btnDumpJson">⬇ Ping all &amp; download JSON</button>
+    <span id="watchAllStatus" style="font-size:11px;color:var(--text-dim);"></span>
+  </div>
+
+  <div class="rail" id="tabRail"></div>
+
+  <div class="grid">
+
+    <div class="panel">
+      <div class="panel-head">
+        <div class="title"><span class="led off" id="connLed"></span><span id="tabTitle">/api/vol_surface/health</span></div>
+        <div class="meta">
+          <span id="lastFetched">never fetched</span>
+          <span class="badge-live" id="liveBadge" style="display:none;"><span class="dot"></span>LIVE</span>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div id="errSlot"></div>
+        <div id="symgrid" class="symgrid"></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <div class="title">Raw response</div>
+        <div class="meta">
+          <span id="byteSize"></span>
+          <button id="btnCopy" style="padding:3px 9px;font-size:10px;">Copy</button>
+        </div>
+      </div>
+      <div class="panel-body">
+        <pre class="json" id="jsonOut">Set a base URL and press Start, or Fetch once.</pre>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <div class="title">Change log — this endpoint</div>
+        <div class="meta"><span id="histCount">0 events</span></div>
+      </div>
+      <div class="panel-body">
+        <div class="history" id="historyLog">
+          <div class="empty">No changes recorded yet. Diffs appear here as fields change between polls.</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="footer-note">
+    All requests run from your browser directly to the base URL above (CORS permitting) — nothing passes through a third-party server.
+    Data is kept in memory only; refreshing this page clears history.
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  // ---------------------------------------------------------------
+  // Services — one base URL (+ optional shared internal API key) per
+  // HF Space. Endpoints below reference these by id.
+  // ---------------------------------------------------------------
+  const SERVICES = [
+    { id:'executor', label:'Executor',  defaultUrl:'https://quasar-intel-executor.hf.space' },
+    { id:'pil',      label:'PIL',       defaultUrl:'https://q-karl-portfolio-intelligence.hf.space' },
+    { id:'jarvis',   label:'Jarvis',    defaultUrl:'https://q-karl-karlcan.hf.space' },
+  ];
+
+  // ---------------------------------------------------------------
+  // Endpoint registry — every GET-safe endpoint across all three
+  // services. POST-only endpoints (/decision, /execute, /feedback,
+  // /qt_sync, /schedule/add, chat, etc.) are write actions, not
+  // monitoring reads, so they're deliberately left out of a passive
+  // dashboard like this one.
+  // ---------------------------------------------------------------
+  const ENDPOINTS = [
+    // --- Executor (deriv_executor_pro.py) -----------------------------
+    { id:'ex_health',    svc:'executor', label:'executor / health',        path:'/health',            kind:'health' },
+    { id:'ex_positions', svc:'executor', label:'executor / positions',     path:'/positions',         kind:'raw' },
+    { id:'ex_trades',    svc:'executor', label:'executor / trade_history', path:'/trade_history',     kind:'raw' },
+    { id:'ex_balance',   svc:'executor', label:'executor / balance',       path:'/balance',           kind:'raw' },
+    { id:'ex_account',   svc:'executor', label:'executor / account_info',  path:'/account_info',      kind:'raw' },
+    { id:'ex_debuglog',  svc:'executor', label:'executor / debug_log',     path:'/debug_log',         kind:'raw' },
+    { id:'ex_karlcan',   svc:'executor', label:'executor / KARLCAN',       path:'/KARLCAN',           kind:'raw' },
+    { id:'ex_portfolio', svc:'executor', label:'executor / PORTFOLIO_INT', path:'/PORTFOLIO_INT',     kind:'raw' },
+
+    // --- PIL (quasar_pil.py) ------------------------------------------
+    { id:'pil_health',      svc:'pil', label:'pil / health',              path:'/pil/health',                kind:'health' },
+    { id:'pil_last',        svc:'pil', label:'pil / last_decisions',      path:'/pil/last_decisions',        kind:'raw' },
+    { id:'pil_lastsym',     svc:'pil', label:'pil / last_decision/{sym}', path:'/pil/last_decision/{symbol}',kind:'raw', needsSymbol:true },
+    { id:'pil_pending',     svc:'pil', label:'pil / pending_decisions',   path:'/pil/pending_decisions',     kind:'raw' },
+    { id:'pil_pendingsym',  svc:'pil', label:'pil / pending/{sym}',       path:'/pil/pending_decisions/{symbol}', kind:'raw', needsSymbol:true },
+    { id:'pil_feedbackhist',svc:'pil', label:'pil / feedback_tracker',    path:'/pil/feedback_tracker/history', kind:'raw' },
+    { id:'pil_qtstatus',    svc:'pil', label:'pil / qt_sync/status',      path:'/pil/qt_sync/status',        kind:'raw' },
+    { id:'pil_rankstatus',  svc:'pil', label:'pil / rank_backbone/status',path:'/pil/rank_backbone/status',  kind:'raw' },
+
+    // --- Jarvis / ASGARD (jarvis_server.py) ----------------------------
+    { id:'jv_health',    svc:'jarvis', label:'jarvis / health',           path:'/health',                    kind:'raw' },
+    { id:'jv_gwhealth',  svc:'jarvis', label:'jarvis / health/gateway',   path:'/health/gateway',            kind:'raw' },
+    { id:'jv_qstatus',   svc:'jarvis', label:'jarvis / quasar/status',    path:'/api/quasar/status',         kind:'raw' },
+    { id:'jv_workspace', svc:'jarvis', label:'jarvis / quasar/workspace', path:'/api/quasar/workspace',      kind:'raw' },
+    { id:'jv_positions', svc:'jarvis', label:'jarvis / quasar/positions', path:'/api/quasar/positions',      kind:'raw' },
+    { id:'jv_tunnel',    svc:'jarvis', label:'jarvis / quasar/tunnel',    path:'/api/quasar/tunnel',         kind:'raw' },
+    { id:'jv_pool',      svc:'jarvis', label:'jarvis / conscious/pool',   path:'/api/jarvis/conscious/pool', kind:'raw' },
+    { id:'jv_models',    svc:'jarvis', label:'jarvis / ollama/models',    path:'/api/ollama/models',         kind:'raw' },
+    { id:'jv_tags',      svc:'jarvis', label:'jarvis / jarvis/tags',      path:'/api/jarvis/tags',           kind:'raw', needsKey:true },
+    { id:'jv_ping',      svc:'jarvis', label:'jarvis / k/ping',           path:'/k/ping',                    kind:'raw' },
+    { id:'jv_folders',   svc:'jarvis', label:'jarvis / export/folders',   path:'/export/folders',            kind:'raw' },
+
+    // --- Jarvis volatility-surface bridge (vol_surface_worker.py) ------
+    { id:'vs_health', svc:'jarvis', label:'vol_surface / health',        path:'/api/vol_surface/health',                  kind:'health' },
+    { id:'vs_syms',   svc:'jarvis', label:'vol_surface / symbols',       path:'/api/vol_surface/symbols',                 kind:'raw' },
+    { id:'vs_snap',   svc:'jarvis', label:'vol_surface / {sym}',         path:'/api/vol_surface/{symbol}',                kind:'raw', needsSymbol:true, needsKey:true },
+    { id:'vs_ctx',    svc:'jarvis', label:'vol_surface / {sym}/context', path:'/api/vol_surface/{symbol}/context',        kind:'raw', needsSymbol:true, needsKey:true },
+    { id:'vs_grid',   svc:'jarvis', label:'vol_surface / {sym}/surface', path:'/api/vol_surface/{symbol}/surface',        kind:'raw', needsSymbol:true, needsKey:true },
+    { id:'vs_dur',    svc:'jarvis', label:'vol_surface / {sym}/duration_table', path:'/api/vol_surface/{symbol}/duration_table', kind:'raw', needsSymbol:true, needsKey:true },
+    { id:'vs_rec',    svc:'jarvis', label:'vol_surface / {sym}/recommendation', path:'/api/vol_surface/{symbol}/recommendation', kind:'raw', needsSymbol:true, needsKey:true },
+    { id:'vs_full',   svc:'jarvis', label:'vol_surface / {sym}/full',    path:'/api/vol_surface/{symbol}/full',           kind:'full', needsSymbol:true, needsKey:true },
+  ];
+
+  let currentEndpoint = ENDPOINTS[0];
+  let currentSymbol = 'R_75';
+  let pollTimer = null;
+  let lastPayloads = {};   // endpoint.id -> last parsed object (for diffing)
+  let history = {};        // endpoint.id -> array of {t, changes:[]}
+  let sparkData = {};      // symbol -> array of staleness_s samples
+  let tabStatus = {};      // endpoint.id -> 'ok'|'warn'|'bad'|'off' (from watch-all)
+  let watchAllTimer = null;
+
+  const $ = (id) => document.getElementById(id);
+  const STORE_PREFIX = 'quasar_deck_';
+
+  // ---------------------------------------------------------------
+  // Per-service base URL + API key config, persisted in localStorage
+  // so you don't have to re-paste four Space URLs every reload.
+  // ---------------------------------------------------------------
+  function svcUrl(svcId){
+    const el = $('svcurl_' + svcId);
+    let v = (el ? el.value : '').trim();
+    if (v.endsWith('/')) v = v.slice(0, -1);
+    return v;
+  }
+  function svcKey(svcId){
+    const el = $('svckey_' + svcId);
+    return el ? el.value.trim() : '';
+  }
+  function renderServiceControls(){
+    const box = $('svcControls');
+    box.innerHTML = '';
+    SERVICES.forEach(svc => {
+      const savedUrl = localStorage.getItem(STORE_PREFIX + 'url_' + svc.id) || svc.defaultUrl;
+      const savedKey = localStorage.getItem(STORE_PREFIX + 'key_' + svc.id) || '';
+      const wrap = document.createElement('div');
+      wrap.className = 'svc-box';
+      wrap.innerHTML = `
+        <div class="svc-name"><span>${svc.label}</span><span class="led off" id="svcled_${svc.id}"></span></div>
+        <input type="text" id="svcurl_${svc.id}" placeholder="https://your-space.hf.space" value="${savedUrl.replace(/"/g,'&quot;')}">
+        <input type="text" class="svc-key" id="svckey_${svc.id}" placeholder="x-api-key (optional)" value="${savedKey.replace(/"/g,'&quot;')}">
+      `;
+      box.appendChild(wrap);
+      $('svcurl_' + svc.id).addEventListener('change', () => {
+        localStorage.setItem(STORE_PREFIX + 'url_' + svc.id, svcUrl(svc.id));
+      });
+      $('svckey_' + svc.id).addEventListener('change', () => {
+        localStorage.setItem(STORE_PREFIX + 'key_' + svc.id, svcKey(svc.id));
+      });
+    });
+  }
+
+  // ---------------------------------------------------------------
+  // Build tab rail (each tab carries a service chip + live status LED,
+  // populated either by the detail-panel fetch or the watch-all loop)
+  // ---------------------------------------------------------------
+  function renderRail(){
+    const rail = $('tabRail');
+    rail.innerHTML = '';
+    ENDPOINTS.forEach(ep => {
+      const tab = document.createElement('div');
+      tab.className = 'tab' + (ep.id === currentEndpoint.id ? ' selected' : '');
+      let pathLabel = ep.path;
+      if (ep.needsSymbol) pathLabel = ep.path.replace('{symbol}', currentSymbol);
+      const svcLabel = (SERVICES.find(s => s.id === ep.svc) || {}).label || ep.svc;
+      const st = tabStatus[ep.id] || 'off';
+      tab.innerHTML = `<span class="tled ${st}" id="tled_${ep.id}"></span><span class="svc-chip">${svcLabel}</span><span class="path">${ep.label}</span>`;
+      tab.title = pathLabel;
+      tab.addEventListener('click', () => {
+        currentEndpoint = ep;
+        renderRail();
+        $('tabTitle').textContent = pathLabel;
+        fetchNow();
+      });
+      rail.appendChild(tab);
+    });
+
+    if (currentEndpoint.needsSymbol){
+      const symSel = document.createElement('select');
+      symSel.style.marginLeft = '4px';
+      const knownSymbols = ['V25','V50','V50_1S','V75','V75_1S','V100','JMP100','CRASH500','CRASH1000','BOOM1000','R_10','R_25','R_50','R_75','R_100','1HZ100V','stpRNG'];
+      knownSymbols.forEach(s => {
+        const o = document.createElement('option');
+        o.value = s; o.textContent = s;
+        if (s === currentSymbol) o.selected = true;
+        symSel.appendChild(o);
+      });
+      symSel.addEventListener('change', () => {
+        currentSymbol = symSel.value;
+        $('tabTitle').textContent = currentEndpoint.path.replace('{symbol}', currentSymbol);
+        fetchNow();
+      });
+      rail.appendChild(symSel);
+    }
+  }
+
+  // ---------------------------------------------------------------
+  // JSON syntax highlight (no reproduction of copyrighted text — this
+  // just colors punctuation/types of the user's OWN live API response)
+  // ---------------------------------------------------------------
+  function highlightJSON(obj){
+    const json = JSON.stringify(obj, null, 2);
+    return json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+-]?\d+)?)/g,
+      (match) => {
+        let cls = 'n';
+        if (/^"/.test(match)) {
+          cls = /:$/.test(match) ? 'k' : 's';
+        } else if (/true|false|null/.test(match)) {
+          cls = 'b';
+        }
+        return `<span class="${cls}">${match}</span>`;
+      });
+  }
+
+  // ---------------------------------------------------------------
+  // Diffing for change log
+  // ---------------------------------------------------------------
+  function flattenDiff(prefix, oldObj, newObj, out){
+    if (typeof newObj !== 'object' || newObj === null){
+      if (oldObj !== newObj) out.push({path:prefix, from:oldObj, to:newObj, kind: oldObj===undefined?'add':'chg'});
+      return;
+    }
+    const keys = new Set([...Object.keys(oldObj||{}), ...Object.keys(newObj||{})]);
+    keys.forEach(k => {
+      const p = prefix ? `${prefix}.${k}` : k;
+      const ov = oldObj ? oldObj[k] : undefined;
+      const nv = newObj[k];
+      if (typeof nv === 'object' && nv !== null && !Array.isArray(nv)){
+        flattenDiff(p, ov, nv, out);
+      } else if (JSON.stringify(ov) !== JSON.stringify(nv)){
+        out.push({path:p, from:ov, to:nv, kind: ov===undefined?'add':(nv===undefined?'rem':'chg')});
+      }
+    });
+  }
+
+  function recordHistory(epId, oldPayload, newPayload){
+    if (!history[epId]) history[epId] = [];
+    if (oldPayload){
+      const diffs = [];
+      flattenDiff('', oldPayload, newPayload, diffs);
+      // Filter out pure staleness_s / age_s noise beyond a threshold to keep log meaningful,
+      // but still show regime/ready/build_errors/connected changes prominently.
+      const meaningful = diffs.filter(d => {
+        if (/staleness_s\.|\bage_s\b/.test(d.path)) return false;
+        return true;
+      });
+      if (meaningful.length){
+        history[epId].unshift({ t: new Date(), diffs: meaningful });
+        if (history[epId].length > 200) history[epId].pop();
+      }
+    }
+    renderHistory(epId);
+  }
+
+  function renderHistory(epId){
+    const box = $('historyLog');
+    const rows = history[epId] || [];
+    $('histCount').textContent = `${rows.length} event${rows.length===1?'':'s'}`;
+    if (!rows.length){
+      box.innerHTML = '<div class="empty">No changes recorded yet. Diffs appear here as fields change between polls.</div>';
+      return;
+    }
+    box.innerHTML = rows.map(r => {
+      const time = r.t.toLocaleTimeString();
+      const parts = r.diffs.slice(0,6).map(d => {
+        const cls = d.kind === 'add' ? 'diff-add' : d.kind === 'rem' ? 'diff-rem' : 'diff-chg';
+        const from = d.from===undefined ? '—' : JSON.stringify(d.from);
+        const to = d.to===undefined ? '—' : JSON.stringify(d.to);
+        return `<span class="${cls}">${d.path}: ${from} → ${to}</span>`;
+      }).join('&nbsp;&nbsp;');
+      const more = r.diffs.length > 6 ? ` <span style="color:var(--text-dim)">+${r.diffs.length-6} more</span>` : '';
+      return `<div class="hist-row"><span class="t">${time}</span><span>${parts}${more}</span><span></span></div>`;
+    }).join('');
+  }
+
+  // ---------------------------------------------------------------
+  // Sparkline (staleness trend per symbol)
+  // ---------------------------------------------------------------
+  function pushSpark(sym, val){
+    if (!sparkData[sym]) sparkData[sym] = [];
+    sparkData[sym].push(val);
+    if (sparkData[sym].length > 40) sparkData[sym].shift();
+  }
+
+  function sparkSVG(sym){
+    const data = sparkData[sym] || [];
+    if (data.length < 2) return '';
+    const w = 200, h = 26, pad = 2;
+    const max = Math.max(...data, 1);
+    const min = 0;
+    const stepX = (w - pad*2) / (data.length - 1);
+    const pts = data.map((v,i) => {
+      const x = pad + i*stepX;
+      const y = h - pad - ((v - min) / (max - min || 1)) * (h - pad*2);
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    }).join(' ');
+    return `<svg class="spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
+      <polyline points="${pts}" fill="none" stroke="var(--green)" stroke-width="1.5" opacity="0.85"/>
+    </svg>`;
+  }
+
+  // ---------------------------------------------------------------
+  // Render parsed symbol cards (health endpoint)
+  // ---------------------------------------------------------------
+  function renderSymbolCards(data){
+    const grid = $('symgrid');
+    if (!data || !data.symbols){
+      grid.innerHTML = '<div class="empty">This endpoint has no per-symbol breakdown — see raw response below.</div>';
+      return;
+    }
+    const maxExpected = data.max_expected_staleness_s || 450;
+    grid.innerHTML = data.symbols.map(sym => {
+      const stale = (data.staleness_s || {})[sym];
+      const isStale = data.stale ? data.stale[sym] : (stale > maxExpected);
+      const regime = (data.regimes || {})[sym] || 'unknown';
+      const ready = data.ready ? data.ready[sym] : null;
+      const buildErr = (data.build_errors || {})[sym];
+      const fl = data.fast_lane && data.fast_lane.symbols ? data.fast_lane.symbols[sym] : null;
+
+      if (typeof stale === 'number') pushSpark(sym, stale);
+      const pct = typeof stale === 'number' ? Math.min(100, (stale / maxExpected) * 100) : 0;
+
+      const flLine = fl
+        ? `<div class="stat"><span>fast lane</span><b style="color:${fl.connected?'var(--green)':'var(--red)'}">${fl.connected ? `${fl.tick_count} ticks` : 'disconnected'}</b></div>`
+        : (data.fast_lane && data.fast_lane.available === false
+            ? `<div class="stat"><span>fast lane</span><b style="color:var(--text-dim)">unavailable</b></div>`
+            : '');
+
+      return `
+      <div class="symcard ${isStale ? 'stale' : ''}">
+        <div class="row1">
+          <span class="sym">${sym}</span>
+          <span class="regime ${regime}">${regime.replace('_',' ')}</span>
+        </div>
+        <div class="stat"><span>ready</span><b style="color:${ready?'var(--green)':'var(--red)'}">${ready === null ? '—' : (ready ? 'yes' : 'no')}</b></div>
+        <div class="stat"><span>staleness</span><b>${typeof stale==='number' ? stale.toFixed(1)+'s' : '—'}</b></div>
+        ${buildErr ? `<div class="stat"><span>error</span><b style="color:var(--red)">${buildErr}</b></div>` : ''}
+        ${flLine}
+        ${sparkSVG(sym)}
+        <div class="stale-bar"><div class="stale-fill" style="width:${pct}%"></div></div>
+      </div>`;
+    }).join('');
+  }
+
+  function renderFullOrRaw(data){
+    $('symgrid').innerHTML = '<div class="empty">No card view for this endpoint — see raw response below.</div>';
+  }
+
+  // ---------------------------------------------------------------
+  // Fetch (single endpoint, into the detail panel)
+  // ---------------------------------------------------------------
+  function buildRequest(ep, symbolOverride){
+    const base = svcUrl(ep.svc);
+    let path = ep.path;
+    if (ep.needsSymbol) path = path.replace('{symbol}', symbolOverride || currentSymbol);
+    const headers = {};
+    const key = svcKey(ep.svc);
+    if (key) headers['x-api-key'] = key;
+    return { url: base + path, headers, base };
+  }
+
+  async function fetchNow(){
+    const { url, headers, base } = buildRequest(currentEndpoint);
+    if (!base){
+      showErr(`No base URL set for "${(SERVICES.find(s=>s.id===currentEndpoint.svc)||{}).label}". Fill it in above.`);
+      $('connLed').className = 'led off';
+      return;
+    }
+
+    $('connLed').className = 'led warn';
+    try {
+      const res = await fetch(url, { cache: 'no-store', headers });
+      const text = await res.text();
+      let data;
+      try { data = JSON.parse(text); } catch(e){ data = { raw_text: text }; }
+
+      const ok = res.ok;
+      $('connLed').className = ok ? 'led ok' : (res.status === 401 ? 'led warn' : 'led bad');
+      setTabStatus(currentEndpoint.id, ok ? 'ok' : (res.status === 401 ? 'warn' : 'bad'));
+      setSvcStatus(currentEndpoint.svc, ok ? 'ok' : 'bad');
+      $('errSlot').innerHTML = ok ? '' : `<div class="errbox">HTTP ${res.status} from ${url}${res.status===401 ? ' — check the x-api-key for this service' : ''}</div>`;
+      $('lastFetched').textContent = 'updated ' + new Date().toLocaleTimeString();
+      $('byteSize').textContent = new Blob([text]).size + ' bytes';
+
+      const jsonBox = $('jsonOut');
+      jsonBox.innerHTML = highlightJSON(data);
+      jsonBox.classList.remove('flash'); void jsonBox.offsetWidth; jsonBox.classList.add('flash');
+
+      if (currentEndpoint.kind === 'health') renderSymbolCards(data);
+      else renderFullOrRaw(data);
+
+      recordHistory(currentEndpoint.id, lastPayloads[currentEndpoint.id], data);
+      lastPayloads[currentEndpoint.id] = data;
+
+    } catch(err){
+      $('connLed').className = 'led bad';
+      setTabStatus(currentEndpoint.id, 'bad');
+      setSvcStatus(currentEndpoint.svc, 'bad');
+      showErr(`Fetch failed: ${err.message}. If this is a CORS error, the Space needs to allow this origin, or open this file served from the same origin.`);
+    }
+  }
+
+  function showErr(msg){
+    $('errSlot').innerHTML = `<div class="errbox">${msg}</div>`;
+  }
+
+  // ---------------------------------------------------------------
+  // Status LEDs — per-tab (rail) and per-service (config strip)
+  // ---------------------------------------------------------------
+  function setTabStatus(epId, status){
+    tabStatus[epId] = status;
+    const el = $('tled_' + epId);
+    if (el) el.className = 'tled ' + status;
+  }
+  function setSvcStatus(svcId, status){
+    const el = $('svcled_' + svcId);
+    if (el) el.className = 'led ' + status;
+  }
+
+  // ---------------------------------------------------------------
+  // Watch ALL endpoints — a lightweight background sweep that pings
+  // every endpoint across all three services (in parallel) and lights
+  // up the rail LEDs, independent of whatever endpoint is open in the
+  // detail panel. This is the replacement for Telegram alerting:
+  // instead of pushing notifications out, the truth sits here — open
+  // this page and every LED tells you at a glance whether that
+  // endpoint answered on the last sweep.
+  //
+  // captureBody=true additionally stores the full parsed response (or
+  // raw text / error) for every endpoint into lastFullDump, which is
+  // what "Ping all & download JSON" exports. The recurring interval
+  // sweep runs with captureBody=false to stay cheap; the one-shot
+  // startup sweep and the explicit download button both run with
+  // captureBody=true so there's always a complete, fresh dump available.
+  // ---------------------------------------------------------------
+  let lastFullDump = null;
+
+  async function watchAllOnce(captureBody){
+    $('watchAllLed').className = 'led warn';
+    const startedAt = new Date();
+    const results = await Promise.all(ENDPOINTS.map(async ep => {
+      const svcMeta = SERVICES.find(s => s.id === ep.svc) || {};
+      const { url, headers, base } = buildRequest(ep, currentSymbol);
+      const record = {
+        id: ep.id, label: ep.label, service: ep.svc, service_label: svcMeta.label,
+        path: ep.path, needs_symbol: !!ep.needsSymbol,
+        symbol: ep.needsSymbol ? currentSymbol : null,
+        base_url: base, url,
+      };
+      if (!base) {
+        setTabStatus(ep.id, 'off');
+        return { ep, ok:null, record: { ...record, ok:null, error:'no base URL configured for this service' } };
+      }
+      const t0 = performance.now();
+      try {
+        const res = await fetch(url, { cache: 'no-store', headers });
+        const ms = Math.round(performance.now() - t0);
+        const text = captureBody ? await res.text() : '';
+        let data = undefined;
+        if (captureBody){
+          try { data = JSON.parse(text); } catch(e){ data = text; }
+        }
+        setTabStatus(ep.id, res.ok ? 'ok' : (res.status === 401 ? 'warn' : 'bad'));
+        return {
+          ep, ok: res.ok,
+          record: {
+            ...record, ok: res.ok, status: res.status, response_time_ms: ms,
+            bytes: captureBody ? new Blob([text]).size : undefined,
+            body: captureBody ? data : undefined,
+          },
+        };
+      } catch (e) {
+        const ms = Math.round(performance.now() - t0);
+        setTabStatus(ep.id, 'bad');
+        return { ep, ok:false, record: { ...record, ok:false, response_time_ms: ms, error: e.message } };
+      }
+    }));
+
+    SERVICES.forEach(svc => {
+      const relevant = results.filter(r => r.ep.svc === svc.id && r.ok !== null);
+      if (!relevant.length) { setSvcStatus(svc.id, 'off'); return; }
+      const allOk = relevant.every(r => r.ok);
+      setSvcStatus(svc.id, allOk ? 'ok' : 'bad');
+    });
+
+    const okCount = results.filter(r => r.ok).length;
+    const badCount = results.filter(r => r.ok === false).length;
+    $('watchAllLed').className = badCount > 0 ? 'led bad' : 'led ok';
+    $('watchAllCount').textContent = `${okCount}/${results.length} responding`;
+    $('watchAllStatus').textContent = `last sweep ${new Date().toLocaleTimeString()}` +
+      (badCount ? ` — ${badCount} endpoint${badCount===1?'':'s'} down/unreachable` : '');
+    renderRail();
+
+    if (captureBody){
+      lastFullDump = {
+        generated_at: startedAt.toISOString(),
+        endpoints_total: results.length,
+        endpoints_ok: okCount,
+        endpoints_failed: badCount,
+        services: SERVICES.map(s => ({ id: s.id, label: s.label, base_url: svcUrl(s.id) })),
+        results: results.map(r => r.record),
+      };
+      const label = $('watchAllLabel');
+      label.classList.add('dump-ready');
+      label.title = 'Full dump ready — click to download JSON';
+    }
+    return results;
+  }
+
+  function downloadJson(obj, filename){
+    const blob = new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  }
+
+  async function pingAllAndDownload(){
+    const btn = $('btnDumpJson');
+    const original = btn.textContent;
+    btn.textContent = '⏳ Pinging all endpoints…';
+    btn.disabled = true;
+    try {
+      await watchAllOnce(true);
+      const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+      downloadJson(lastFullDump, `quasar_endpoint_dump_${stamp}.json`);
+    } finally {
+      btn.textContent = original;
+      btn.disabled = false;
+    }
+  }
+
+  function startWatchAll(){
+    stopWatchAll();
+    const rate = parseInt($('watchAllRate').value, 10);
+    watchAllOnce(false);
+    if (rate > 0){
+      watchAllTimer = setInterval(() => watchAllOnce(false), rate);
+      $('btnWatchAll').classList.add('active');
+      $('btnWatchAll').textContent = '■ Stop watching all';
+    }
+  }
+  function stopWatchAll(){
+    if (watchAllTimer) clearInterval(watchAllTimer);
+    watchAllTimer = null;
+    $('btnWatchAll').classList.remove('active');
+    $('btnWatchAll').textContent = '▶ Watch all endpoints';
+    $('watchAllLed').className = 'led off';
+  }
+
+  // ---------------------------------------------------------------
+  // Polling controls (detail panel — single selected endpoint)
+  // ---------------------------------------------------------------
+  function startPolling(){
+    stopPolling();
+    const rate = parseInt($('pollRate').value, 10);
+    fetchNow();
+    if (rate > 0){
+      pollTimer = setInterval(fetchNow, rate);
+      $('liveBadge').style.display = 'inline-flex';
+      $('btnStart').classList.add('active');
+    }
+  }
+  function stopPolling(){
+    if (pollTimer) clearInterval(pollTimer);
+    pollTimer = null;
+    $('liveBadge').style.display = 'none';
+    $('btnStart').classList.remove('active');
+  }
+
+  $('btnStart').addEventListener('click', startPolling);
+  $('btnStop').addEventListener('click', stopPolling);
+  $('btnClearHist').addEventListener('click', () => {
+    history[currentEndpoint.id] = [];
+    renderHistory(currentEndpoint.id);
+  });
+  $('btnCopy').addEventListener('click', () => {
+    const data = lastPayloads[currentEndpoint.id];
+    if (data) navigator.clipboard.writeText(JSON.stringify(data, null, 2));
+  });
+  $('pollRate').addEventListener('change', () => { if (pollTimer) startPolling(); });
+
+  $('btnWatchAll').addEventListener('click', () => {
+    if (watchAllTimer) stopWatchAll(); else startWatchAll();
+  });
+  $('watchAllRate').addEventListener('change', () => { if (watchAllTimer) startWatchAll(); });
+  $('btnDumpJson').addEventListener('click', pingAllAndDownload);
+  $('watchAllLabel').addEventListener('click', () => {
+    if (!lastFullDump) return;
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    downloadJson(lastFullDump, `quasar_endpoint_dump_${stamp}.json`);
+  });
+
+  renderServiceControls();
+  renderRail();
+  $('watchAllCount').textContent = `${ENDPOINTS.length} endpoints registered`;
+
+  // ---------------------------------------------------------------
+  // Startup full sweep: on page load, ping every endpoint once with
+  // captureBody=true so a complete debug dump (lastFullDump) is ready
+  // immediately — no need to press "Watch all" first. One-shot only;
+  // it does not start the recurring interval.
+  // ---------------------------------------------------------------
+  watchAllOnce(true).catch(err => console.error('startup sweep failed', err));
+})();
+</script>
+</body>
+</html>
