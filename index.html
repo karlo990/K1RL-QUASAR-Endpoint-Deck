@@ -344,6 +344,17 @@
     { id:'executor', label:'Executor',  defaultUrl:'https://quasar-intel-executor.hf.space' },
     { id:'pil',      label:'PIL',       defaultUrl:'https://q-karl-portfolio-intelligence.hf.space' },
     { id:'jarvis',   label:'Jarvis',    defaultUrl:'https://q-karl-karlcan.hf.space' },
+    // Conscious Worker pool — 3 dedicated Spaces behind ASGARD's
+    // Power-of-Two-Choices load balancer. Paste each worker's real
+    // HF Space URL below; left blank until filled in (unlike the three
+    // above, there's no single canonical URL to default to per-worker).
+    // These exist to answer "why aren't decisions reaching a worker":
+    // health shows queue_depth/max_inflight (is it saturated?), metrics
+    // shows total_calls/timeouts/errors (is it even being routed to?),
+    // qt_sync/status shows prefix_active/age_sec (is its KV cache stale?).
+    { id:'consciousA', label:'Conscious Worker α', defaultUrl:'' },
+    { id:'consciousB', label:'Conscious Worker β', defaultUrl:'' },
+    { id:'consciousC', label:'Conscious Worker γ', defaultUrl:'' },
   ];
 
   // ---------------------------------------------------------------
@@ -412,6 +423,27 @@
     { id:'vs_dur',    svc:'jarvis', label:'vol_surface / {sym}/duration_table', path:'/api/vol_surface/{symbol}/duration_table', kind:'raw', needsSymbol:true, needsKey:true },
     { id:'vs_rec',    svc:'jarvis', label:'vol_surface / {sym}/recommendation', path:'/api/vol_surface/{symbol}/recommendation', kind:'raw', needsSymbol:true, needsKey:true },
     { id:'vs_full',   svc:'jarvis', label:'vol_surface / {sym}/full',    path:'/api/vol_surface/{symbol}/full',           kind:'full', needsSymbol:true, needsKey:true },
+
+    // --- Conscious Worker pool (conscious_worker.py) — one block per
+    // worker (α/β/γ). health = is it up + how saturated (queue_depth vs
+    // max_inflight); metrics = is the LB actually routing to it at all
+    // (total_calls) and how healthy those calls are (timeouts/errors);
+    // qt_sync/status = is its KV-warm prefix fresh (age_sec) or stale,
+    // which silently degrades inference quality without erroring. ------
+    { id:'cwA_health',  svc:'consciousA', label:'conscious α / health',         path:'/health',           kind:'health' },
+    { id:'cwA_gwhealth',svc:'consciousA', label:'conscious α / health/gateway', path:'/health/gateway',   kind:'raw' },
+    { id:'cwA_metrics', svc:'consciousA', label:'conscious α / metrics',        path:'/metrics',          kind:'raw' },
+    { id:'cwA_qtstatus',svc:'consciousA', label:'conscious α / qt_sync/status', path:'/qt_sync/status',   kind:'raw' },
+
+    { id:'cwB_health',  svc:'consciousB', label:'conscious β / health',         path:'/health',           kind:'health' },
+    { id:'cwB_gwhealth',svc:'consciousB', label:'conscious β / health/gateway', path:'/health/gateway',   kind:'raw' },
+    { id:'cwB_metrics', svc:'consciousB', label:'conscious β / metrics',        path:'/metrics',          kind:'raw' },
+    { id:'cwB_qtstatus',svc:'consciousB', label:'conscious β / qt_sync/status', path:'/qt_sync/status',   kind:'raw' },
+
+    { id:'cwC_health',  svc:'consciousC', label:'conscious γ / health',         path:'/health',           kind:'health' },
+    { id:'cwC_gwhealth',svc:'consciousC', label:'conscious γ / health/gateway', path:'/health/gateway',   kind:'raw' },
+    { id:'cwC_metrics', svc:'consciousC', label:'conscious γ / metrics',        path:'/metrics',          kind:'raw' },
+    { id:'cwC_qtstatus',svc:'consciousC', label:'conscious γ / qt_sync/status', path:'/qt_sync/status',   kind:'raw' },
   ];
 
   let currentEndpoint = ENDPOINTS[0];
