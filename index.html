@@ -285,6 +285,16 @@
       </div>
       <div class="panel-body">
         <div id="errSlot"></div>
+        <div id="postEditor" style="display:none;margin-bottom:12px;">
+          <div style="font-size:11px;color:var(--text-dim);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;">
+            POST body (editable — this is a write/agent-bridge endpoint, nothing is sent until you click Send)
+          </div>
+          <textarea id="postBody" spellcheck="false" style="width:100%;min-height:110px;background:var(--panel-raised);border:1px solid var(--line);color:var(--text);font-family:monospace;font-size:12px;padding:8px;border-radius:6px;resize:vertical;"></textarea>
+          <div style="margin-top:8px;display:flex;gap:8px;align-items:center;">
+            <button id="btnSendPost" class="primary">▶ Send &amp; sniff response</button>
+            <span id="postSendStatus" style="font-size:11px;color:var(--text-dim);"></span>
+          </div>
+        </div>
         <div id="symgrid" class="symgrid"></div>
       </div>
     </div>
@@ -338,10 +348,14 @@
 
   // ---------------------------------------------------------------
   // Endpoint registry — every GET-safe endpoint across all three
-  // services. POST-only endpoints (/decision, /execute, /feedback,
-  // /qt_sync, /schedule/add, chat, etc.) are write actions, not
-  // monitoring reads, so they're deliberately left out of a passive
-  // dashboard like this one.
+  // services, PLUS the write/agent-bridge POST endpoints below
+  // (method:'POST'). POST endpoints are never touched by the
+  // automatic startup sweep or the recurring "Watch all" poller —
+  // they're excluded from both loops. They only fire when you
+  // select the tab and click "Send & sniff response" with an
+  // editable JSON body, so reflexion pushes / KV warm signals /
+  // gateway calls can be inspected without spamming the live
+  // trading pipeline on every poll interval.
   // ---------------------------------------------------------------
   const ENDPOINTS = [
     // --- Executor (deriv_executor_pro.py) -----------------------------
@@ -363,6 +377,8 @@
     { id:'pil_feedbackhist',svc:'pil', label:'pil / feedback_tracker',    path:'/pil/feedback_tracker/history', kind:'raw' },
     { id:'pil_qtstatus',    svc:'pil', label:'pil / qt_sync/status',      path:'/pil/qt_sync/status',        kind:'raw' },
     { id:'pil_rankstatus',  svc:'pil', label:'pil / rank_backbone/status',path:'/pil/rank_backbone/status',  kind:'raw' },
+    { id:'pil_acctpulse',   svc:'pil', label:'pil / account_pulse (compat)', path:'/pil/account_pulse', kind:'raw', method:'POST',
+      testBody:{ balance: 1000, equity: 1000, margin: 0, margin_level: null, pnl_pct: 0 } },
 
     // --- Jarvis / ASGARD (jarvis_server.py) ----------------------------
     { id:'jv_health',    svc:'jarvis', label:'jarvis / health',           path:'/health',                    kind:'raw' },
@@ -371,9 +387,19 @@
     { id:'jv_workspace', svc:'jarvis', label:'jarvis / quasar/workspace', path:'/api/jarvis/quasar/workspace',      kind:'raw' },
     { id:'jv_positions', svc:'jarvis', label:'jarvis / quasar/positions', path:'/api/jarvis/quasar/positions',      kind:'raw' },
     { id:'jv_tunnel',    svc:'jarvis', label:'jarvis / quasar/tunnel',    path:'/api/jarvis/quasar/tunnel',         kind:'raw' },
+    { id:'jv_reflexion', svc:'jarvis', label:'jarvis / quasar/reflexion (bridge)', path:'/api/quasar/reflexion', kind:'raw', method:'POST', needsKey:true,
+      testBody:{ event:'position_closed', symbol:'R_75', ticket:'TEST123', pnl:0, duration_s:60, outcome:'test-sniff' } },
+    { id:'jv_acctpulse', svc:'jarvis', label:'jarvis / account_pulse (bridge)', path:'/api/jarvis/account_pulse', kind:'raw', method:'POST', needsKey:true,
+      testBody:{ balance: 1000, equity: 1000, margin: 0, margin_level: null, pnl_pct: 0 } },
     { id:'jv_pool',      svc:'jarvis', label:'jarvis / conscious/pool',   path:'/api/jarvis/conscious/pool', kind:'raw' },
     { id:'jv_models',    svc:'jarvis', label:'jarvis / ollama/models',    path:'/api/jarvis/ollama/models',         kind:'raw' },
     { id:'jv_tags',      svc:'jarvis', label:'jarvis / jarvis/tags',      path:'/api/jarvis/tags',           kind:'raw', needsKey:true },
+    { id:'jv_gateway',   svc:'jarvis', label:'jarvis / llm/gateway',      path:'/api/jarvis/llm/gateway',    kind:'raw', method:'POST', needsKey:true,
+      testBody:{ payload:{ prompt:'sniff test' }, priority:10, symbol:'R_75' } },
+    { id:'jv_markhot',   svc:'jarvis', label:'jarvis / llm/mark_hot (KV warm)', path:'/api/jarvis/llm/mark_hot', kind:'raw', method:'POST', needsKey:true,
+      testBody:{ symbol:'R_75' } },
+    { id:'jv_durdebate', svc:'jarvis', label:'jarvis / duration_debate',  path:'/api/jarvis/duration_debate', kind:'raw', method:'POST', needsKey:true,
+      testBody:{ symbol:'R_75' } },
     { id:'jv_ping',      svc:'jarvis', label:'jarvis / k/ping',           path:'/k/ping',                    kind:'raw' },
     { id:'jv_folders',   svc:'jarvis', label:'jarvis / export/folders',   path:'/export/folders',            kind:'raw' },
 
@@ -457,7 +483,12 @@
         currentEndpoint = ep;
         renderRail();
         $('tabTitle').textContent = pathLabel;
-        fetchNow();
+        if ((ep.method || 'GET') === 'POST'){
+          showPostEditor(ep);
+        } else {
+          hidePostEditor();
+          fetchNow();
+        }
       });
       rail.appendChild(tab);
     });
@@ -636,18 +667,24 @@
   // ---------------------------------------------------------------
   // Fetch (single endpoint, into the detail panel)
   // ---------------------------------------------------------------
-  function buildRequest(ep, symbolOverride){
+  function buildRequest(ep, symbolOverride, bodyOverride){
     const base = svcUrl(ep.svc);
     let path = ep.path;
     if (ep.needsSymbol) path = path.replace('{symbol}', symbolOverride || currentSymbol);
     const headers = {};
     const key = svcKey(ep.svc);
     if (key) headers['x-api-key'] = key;
-    return { url: base + path, headers, base };
+    const method = ep.method || 'GET';
+    let body;
+    if (method === 'POST'){
+      headers['Content-Type'] = 'application/json';
+      body = bodyOverride !== undefined ? bodyOverride : JSON.stringify(ep.testBody || {});
+    }
+    return { url: base + path, headers, base, method, body };
   }
 
-  async function fetchNow(){
-    const { url, headers, base } = buildRequest(currentEndpoint);
+  async function fetchNow(bodyOverride){
+    const { url, headers, base, method, body } = buildRequest(currentEndpoint, currentSymbol, bodyOverride);
     if (!base){
       showErr(`No base URL set for "${(SERVICES.find(s=>s.id===currentEndpoint.svc)||{}).label}". Fill it in above.`);
       $('connLed').className = 'led off';
@@ -656,7 +693,7 @@
 
     $('connLed').className = 'led warn';
     try {
-      const res = await fetch(url, { cache: 'no-store', headers });
+      const res = await fetch(url, { cache: 'no-store', headers, method, body });
       const text = await res.text();
       let data;
       try { data = JSON.parse(text); } catch(e){ data = { raw_text: text }; }
@@ -692,6 +729,42 @@
   }
 
   // ---------------------------------------------------------------
+  // POST payload editor — used by write/agent-bridge endpoints
+  // (reflexion, account_pulse, mark_hot/KV warm, llm/gateway,
+  // duration_debate). Nothing fires until "Send & sniff response"
+  // is clicked; the body textarea is prefilled from ep.testBody
+  // so it's editable before firing.
+  // ---------------------------------------------------------------
+  function showPostEditor(ep){
+    $('postEditor').style.display = 'block';
+    $('postBody').value = JSON.stringify(ep.testBody || {}, null, 2);
+    $('postSendStatus').textContent = '';
+    $('jsonOut').textContent = 'Edit the body above, then click "Send & sniff response" to fire this request.';
+    $('errSlot').innerHTML = '';
+    $('symgrid').innerHTML = '';
+    $('lastFetched').textContent = 'not sent yet';
+    $('byteSize').textContent = '';
+  }
+  function hidePostEditor(){
+    $('postEditor').style.display = 'none';
+  }
+
+  $('btnSendPost').addEventListener('click', async () => {
+    let parsed;
+    try {
+      parsed = JSON.parse($('postBody').value);
+    } catch (e){
+      $('postSendStatus').textContent = `Invalid JSON: ${e.message}`;
+      $('postSendStatus').style.color = 'var(--red)';
+      return;
+    }
+    $('postSendStatus').style.color = 'var(--text-dim)';
+    $('postSendStatus').textContent = 'Sending…';
+    await fetchNow(JSON.stringify(parsed));
+    $('postSendStatus').textContent = 'Sent — see raw response below.';
+  });
+
+  // ---------------------------------------------------------------
   // Status LEDs — per-tab (rail) and per-service (config strip)
   // ---------------------------------------------------------------
   function setTabStatus(epId, status){
@@ -719,13 +792,20 @@
   // sweep runs with captureBody=false to stay cheap; the one-shot
   // startup sweep and the explicit download button both run with
   // captureBody=true so there's always a complete, fresh dump available.
+  //
+  // POST/write endpoints (reflexion, account_pulse, mark_hot, gateway,
+  // duration_debate) are deliberately excluded from this sweep — auto-
+  // firing them on a timer would spam the live agent bridge / trading
+  // pipeline. They only fire when manually triggered via the payload
+  // editor's "Send & sniff response" button.
   // ---------------------------------------------------------------
   let lastFullDump = null;
+  const SWEEPABLE_ENDPOINTS = ENDPOINTS.filter(ep => (ep.method || 'GET') === 'GET');
 
   async function watchAllOnce(captureBody){
     $('watchAllLed').className = 'led warn';
     const startedAt = new Date();
-    const results = await Promise.all(ENDPOINTS.map(async ep => {
+    const results = await Promise.all(SWEEPABLE_ENDPOINTS.map(async ep => {
       const svcMeta = SERVICES.find(s => s.id === ep.svc) || {};
       const { url, headers, base } = buildRequest(ep, currentSymbol);
       const record = {
@@ -784,6 +864,8 @@
         endpoints_total: results.length,
         endpoints_ok: okCount,
         endpoints_failed: badCount,
+        write_endpoints_excluded: ENDPOINTS.length - SWEEPABLE_ENDPOINTS.length,
+        write_endpoints_note: 'POST/write endpoints (reflexion, account_pulse, mark_hot, gateway, duration_debate) are not auto-swept — fire them manually from their tab.',
         services: SERVICES.map(s => ({ id: s.id, label: s.label, base_url: svcUrl(s.id) })),
         results: results.map(r => r.record),
       };
